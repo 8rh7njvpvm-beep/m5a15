@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>星際方程：晶體風暴</title>
+<style>
+    :root {
+        --primary: #00f3ff;
+        --secondary: #ff00de;
+        --accent: #ffee00;
+        --bg-dark: #050b14;
+        --glass: rgba(255, 255, 255, 0.1);
+        --text-color: #ffffff;
+        --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    * { box-sizing: border-box; touch-action: manipulation; user-select: none; }
+    
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--font-main);
+        background-color: var(--bg-dark);
+        color: var(--text-color);
+        overflow: hidden;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* --- 分數樣式 (新增) --- */
+    .fraction {
+        display: inline-flex;
+        flex-direction: column;
+        vertical-align: middle;
+        text-align: center;
+        margin: 0 4px;
+        font-size: 0.9em;
+    }
+    .frac-top {
+        border-bottom: 2px solid currentColor;
+        padding: 0 2px 1px 2px;
+        display: block;
+    }
+    .frac-btm {
+        padding: 1px 2px 0 2px;
+        display: block;
+    }
+
+    /* --- 背景特效 --- */
+    .space-bg {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+        z-index: -2;
+    }
+    .stars {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-image: 
+            radial-gradient(2px 2px at 20px 30px, #eee, rgba(0,0,0,0)),
+            radial-gradient(2px 2px at 40px 70px, #fff, rgba(0,0,0,0)),
+            radial-gradient(2px 2px at 50px 160px, #ddd, rgba(0,0,0,0)),
+            radial-gradient(2px 2px at 90px 40px, #fff, rgba(0,0,0,0));
+        background-size: 200px 200px;
+        animation: starMove 100s linear infinite;
+        opacity: 0.6;
+    }
+    @keyframes starMove { from { background-position: 0 0; } to { background-position: 0 1000px; } }
+
+    /* --- UI 組件 --- */
+    .container {
+        width: 100%;
+        max-width: 600px;
+        height: 100%;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        z-index: 10;
+    }
+
+    /* HUD */
+    .hud {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 15px;
+        border: 1px solid var(--primary);
+        box-shadow: 0 0 10px var(--primary);
+        margin-bottom: 20px;
+    }
+    .hud-item { font-size: 1.2rem; font-weight: bold; }
+    .hud-label { font-size: 0.8rem; color: #aaa; }
+
+    /* 遊戲區域 */
+    .game-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+    }
+
+    /* 敵人/寶石 */
+    .enemy-container {
+        font-size: 8rem;
+        filter: drop-shadow(0 0 20px var(--secondary));
+        animation: float 3s ease-in-out infinite;
+        margin-bottom: 20px;
+        transition: transform 0.2s;
+    }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+    .enemy-shake { animation: shake 0.5s; }
+    @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 10% { transform: translate(-1px, -2px) rotate(-1deg); } 20% { transform: translate(-3px, 0px) rotate(1deg); } 30% { transform: translate(3px, 2px) rotate(0deg); } 40% { transform: translate(1px, -1px) rotate(1deg); } 50% { transform: translate(-1px, 2px) rotate(-1deg); } 60% { transform: translate(-3px, 1px) rotate(0deg); } 70% { transform: translate(3px, 1px) rotate(-1deg); } 80% { transform: translate(-1px, -1px) rotate(1deg); } 90% { transform: translate(1px, 2px) rotate(0deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); } }
+
+    /* 題目卡片 */
+    .question-card {
+        background: rgba(16, 24, 45, 0.9);
+        border: 2px solid var(--primary);
+        border-radius: 15px;
+        padding: 20px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+        margin-bottom: 20px;
+        backdrop-filter: blur(5px);
+    }
+    .question-text {
+        font-size: 1.3rem;
+        line-height: 1.6;
+        margin-bottom: 10px;
+        color: #fff;
+    }
+
+    /* 選項按鈕 */
+    .options-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        width: 100%;
+    }
+    .option-btn {
+        background: linear-gradient(145deg, #1a2a40, #101825);
+        border: 1px solid var(--primary);
+        color: var(--primary);
+        padding: 10px 5px; /* 調整 padding 適應分數高度 */
+        min-height: 70px;
+        font-size: 1.3rem;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'Courier New', Courier, monospace;
+        font-weight: bold;
+        display: flex;           /* 改為 Flex 佈局 */
+        justify-content: center; /* 水平居中 */
+        align-items: center;     /* 垂直居中 */
+    }
+    .option-btn:active { transform: scale(0.95); }
+    .option-btn:hover { background: rgba(0, 243, 255, 0.1); box-shadow: 0 0 15px var(--primary); }
+    
+    /* 反饋樣式 */
+    .btn-correct { background: #00ff00 !important; color: #000 !important; border-color: #00ff00 !important; }
+    .btn-wrong { background: #ff0000 !important; color: #fff !important; border-color: #ff0000 !important; }
+
+    /* 頁面切換 */
+    .screen { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; }
+    .screen.active { display: flex; }
+
+    /* 開始畫面 & 結算畫面 */
+    h1 { font-size: 2.5rem; text-align: center; color: var(--primary); text-shadow: 0 0 10px var(--primary); margin-bottom: 30px; }
+    .start-btn {
+        padding: 15px 40px;
+        font-size: 1.5rem;
+        background: var(--primary);
+        color: #000;
+        border: none;
+        border-radius: 30px;
+        cursor: pointer;
+        font-weight: bold;
+        box-shadow: 0 0 20px var(--primary);
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 243, 255, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(0, 243, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 243, 255, 0); } }
+
+    /* 訂正區域 */
+    .review-area {
+        width: 100%;
+        max-height: 50vh;
+        overflow-y: auto;
+        background: rgba(0,0,0,0.6);
+        padding: 10px;
+        border-radius: 10px;
+        margin-top: 10px;
+    }
+    .review-item {
+        background: #2a1111;
+        border-left: 4px solid #ff0055;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        text-align: left;
+    }
+    .review-q { font-weight: bold; margin-bottom: 5px; color: #fff; }
+    .review-ans { color: #aaa; font-size: 0.9rem; margin: 4px 0; }
+    .review-correct { color: #00ff00; font-weight: bold; display: flex; align-items: center;}
+    .review-expl { color: var(--accent); font-size: 0.9rem; margin-top: 5px; font-style: italic; }
+
+    /* 進度條 */
+    .progress-container { width: 100%; height: 6px; background: #333; margin-top: 10px; border-radius: 3px; }
+    .progress-bar { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; border-radius: 3px; }
+
+    /* 雷射特效 */
+    .laser {
+        position: absolute;
+        width: 4px;
+        height: 50px;
+        background: var(--primary);
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        box-shadow: 0 0 10px #fff;
+        z-index: 5;
+        display: none;
+    }
+
+</style>
+</head>
+<body>
+
+    <div class="space-bg"><div class="stars"></div></div>
+
+    <div class="container">
+        <div id="start-screen" class="screen active">
+            <h1>🌌 星際方程<br><span style="font-size:1.5rem; color:#fff;">晶體風暴</span></h1>
+            <div style="font-size: 5rem; margin-bottom: 30px;">🚀</div>
+            <p style="text-align:center; max-width: 80%; line-height: 1.5; color: #ccc; margin-bottom: 30px;">
+                指揮官！前方的航道被 <b>水晶小行星</b> 阻擋了。<br>
+                解開 <b>兩步方程</b>，填充雷射能量，擊碎障礙物！<br>
+                <br>
+                目標：連續解決 5 道難題
+            </p>
+            <button class="start-btn" onclick="game.start()">開始任務</button>
+        </div>
+
+        <div id="game-screen" class="screen">
+            <div class="hud">
+                <div class="hud-item">
+                    <span class="hud-label">得分</span><br>
+                    <span id="score-display">0</span>
+                </div>
+                <div class="hud-item" style="text-align:right;">
+                    <span class="hud-label">關卡</span><br>
+                    <span id="level-display">1/5</span>
+                </div>
+            </div>
+
+            <div class="game-area">
+                <div id="enemy" class="enemy-container">💎</div>
+                <div id="laser" class="laser"></div>
+                
+                <div class="question-card">
+                    <div id="question-text" class="question-text">載入中...</div>
+                </div>
+
+                <div id="options-area" class="options-grid">
+                    </div>
+            </div>
+
+            <div class="progress-container">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+        </div>
+
+        <div id="end-screen" class="screen">
+            <h1>任務完成</h1>
+            <div id="final-rank" style="font-size: 5rem; margin-bottom: 10px;">🏆</div>
+            <h2 id="final-score" style="color:var(--primary)">總分: 0</h2>
+            
+            <div id="review-container" class="review-area" style="display:none;">
+                <h3 style="margin-top:0; color:#ff0055;">⚠️ 錯誤訂正</h3>
+                <div id="review-list"></div>
+            </div>
+            
+            <button class="start-btn" onclick="game.start()" style="margin-top: 20px; font-size: 1.2rem;">再次挑戰</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * 遊戲邏輯核心
+ */
+
+// --- 音效系統 ---
+const audioSys = {
+    ctx: null,
+    init: function() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    playTone: function(freq, type, duration) {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+    playShoot: function() { this.init(); this.playTone(800, 'sawtooth', 0.2); },
+    playHit: function() { this.init(); this.playTone(200, 'square', 0.3); },
+    playWrong: function() { this.init(); this.playTone(100, 'sawtooth', 0.4); },
+    playWin: function() { 
+        this.init(); 
+        [440, 554, 659].forEach((f, i) => setTimeout(() => this.playTone(f, 'sine', 0.3), i*100));
+    }
+};
+
+// --- 輔助函數：生成 HTML 分數 ---
+const mkFrac = (top, bottom) => {
+    return `<div class="fraction"><span class="frac-top">${top}</span><span class="frac-btm">${bottom}</span></div>`;
+};
+
+// --- 題目生成器 (Procedural Question Generator) ---
+const QuestionGenerator = {
+    rand: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+    
+    templates: [
+        {
+            // 類型：ax + b = c (購物場景)
+            id: 'shopping',
+            generate: function() {
+                const items = ["筆記本", "鉛筆", "橡皮擦", "貼紙", "能量棒"];
+                const item = items[Math.floor(Math.random() * items.length)];
+                const x = Math.floor(Math.random() * 8) + 3;
+                const num = Math.floor(Math.random() * 5) + 2;
+                const extra = Math.floor(Math.random() * 20) + 10;
+                const total = num * x + extra;
+                
+                return {
+                    text: `小明買了 ${num} 個${item}，每個 $x$ 元，還買了一個 $${extra} 元的袋子，總共花了 $${total} 元。`,
+                    correctEq: `${num}x + ${extra} = ${total}`,
+                    wrongEqs: [
+                        `${num}x - ${extra} = ${total}`,
+                        `x + ${extra} = ${total}`,
+                        `${num} + x = ${total}`
+                    ],
+                    explanation: `總花費 = (${num}個 × 單價) + 袋子錢。即 ${num}x + ${extra} = ${total}。`
+                };
+            }
+        },
+        {
+            // 類型：ax - b = c (剩餘/差倍場景)
+            id: 'remain',
+            generate: function() {
+                const x = Math.floor(Math.random() * 10) + 5; 
+                const factor = Math.floor(Math.random() * 5) + 2; 
+                const diff = Math.floor(Math.random() * 10) + 5; 
+                const result = factor * x - diff; 
+                
+                return {
+                    text: `一個數 $x$ 的 ${factor} 倍減去 ${diff} 等於 ${result}。`,
+                    correctEq: `${factor}x - ${diff} = ${result}`,
+                    wrongEqs: [
+                        `${factor}x + ${diff} = ${result}`,
+                        `${factor}(x - ${diff}) = ${result}`,
+                        `x - ${diff} = ${result}`
+                    ],
+                    explanation: `「x的${factor}倍」是 ${factor}x，「減去${diff}」即 -${diff}，結果為 ${result}。`
+                };
+            }
+        },
+        {
+            // 類型：a(x+b)=c (分配場景)
+            id: 'distribute',
+            generate: function() {
+                const groups = Math.floor(Math.random() * 4) + 2;
+                const x = Math.floor(Math.random() * 10) + 2;
+                const add = Math.floor(Math.random() * 5) + 1;
+                const total = groups * (x + add);
+                
+                return {
+                    text: `老師將同學分成 ${groups} 組，每組原本有 $x$ 人，後來每組加入了 ${add} 人，現在共有 ${total} 人。`,
+                    correctEq: `${groups}(x + ${add}) = ${total}`,
+                    wrongEqs: [
+                        `${groups}x + ${add} = ${total}`,
+                        `${groups}x + ${groups}${add} = ${total}`,
+                        `x + ${add} = ${total}`
+                    ],
+                    explanation: `每組人數變為 (x + ${add})，共有 ${groups} 組，所以是 ${groups}(x + ${add}) = ${total}。`
+                };
+            }
+        },
+        {
+            // 類型：x/a + b = c (除法場景 - 使用分數形式)
+            id: 'division',
+            generate: function() {
+                const C = Math.floor(Math.random() * 10) + 5;
+                const B = Math.floor(Math.random() * 4) + 1;
+                const A = Math.floor(Math.random() * 3) + 2;
+                // x = (C-B)*A, 但不需要算出來，只需要列式
+                
+                // 使用 mkFrac 生成 HTML 分數
+                const fracX = mkFrac('x', A);
+                
+                return {
+                    text: `把一包糖果 $x$ 平均分成 ${A} 堆，每堆再多放 ${B} 顆，每堆就有 ${C} 顆。`,
+                    correctEq: `${fracX} + ${B} = ${C}`,
+                    wrongEqs: [
+                        `${fracX} - ${B} = ${C}`,
+                        `${A}x + ${B} = ${C}`,
+                        `x + ${B} = ${C}`
+                    ],
+                    explanation: `「平均分成${A}堆」是 ${fracX}，「多放${B}顆」是 +${B}，等於 ${C}。`
+                };
+            }
+        }
+    ],
+
+    getBatch: function(count) {
+        const batch = [];
+        for(let i=0; i<count; i++) {
+            const t = this.templates[Math.floor(Math.random() * this.templates.length)];
+            const q = t.generate();
+            
+            const options = [
+                { text: q.correctEq, isCorrect: true },
+                { text: q.wrongEqs[0], isCorrect: false },
+                { text: q.wrongEqs[1], isCorrect: false },
+                { text: q.wrongEqs[2], isCorrect: false }
+            ].sort(() => Math.random() - 0.5);
+
+            batch.push({
+                question: q.text,
+                options: options,
+                explanation: q.explanation,
+                correctText: q.correctEq
+            });
+        }
+        return batch;
+    }
+};
+
+// --- 遊戲主程式 ---
+const game = {
+    totalQuestions: 5,
+    questions: [],
+    currentIndex: 0,
+    score: 0,
+    wrongAnswers: [],
+
+    // DOM Elements
+    screens: {
+        start: document.getElementById('start-screen'),
+        game: document.getElementById('game-screen'),
+        end: document.getElementById('end-screen')
+    },
+    ui: {
+        score: document.getElementById('score-display'),
+        level: document.getElementById('level-display'),
+        qText: document.getElementById('question-text'),
+        options: document.getElementById('options-area'),
+        enemy: document.getElementById('enemy'),
+        progress: document.getElementById('progress-bar'),
+        laser: document.getElementById('laser'),
+        finalScore: document.getElementById('final-score'),
+        finalRank: document.getElementById('final-rank'),
+        reviewContainer: document.getElementById('review-container'),
+        reviewList: document.getElementById('review-list')
+    },
+
+    enemies: ['💎', '🔷', '💠', '🪐', '☄️', '👾'],
+
+    start: function() {
+        this.score = 0;
+        this.currentIndex = 0;
+        this.wrongAnswers = [];
+        this.questions = QuestionGenerator.getBatch(this.totalQuestions);
+        
+        this.switchScreen('game');
+        this.updateHUD();
+        this.loadQuestion();
+        audioSys.init();
+    },
+
+    switchScreen: function(name) {
+        Object.values(this.screens).forEach(s => s.classList.remove('active'));
+        this.screens[name].classList.add('active');
+    },
+
+    updateHUD: function() {
+        this.ui.score.innerText = this.score;
+        this.ui.level.innerText = `${this.currentIndex + 1} / ${this.totalQuestions}`;
+        const pct = (this.currentIndex / this.totalQuestions) * 100;
+        this.ui.progress.style.width = `${pct}%`;
+    },
+
+    loadQuestion: function() {
+        const q = this.questions[this.currentIndex];
+        
+        this.ui.qText.innerHTML = q.question;
+        this.ui.options.innerHTML = '';
+        this.ui.enemy.innerText = this.enemies[this.currentIndex % this.enemies.length];
+        this.ui.enemy.classList.remove('enemy-shake');
+        this.ui.enemy.style.opacity = '1';
+
+        q.options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            // 重要：這裡從 innerText 改為 innerHTML 以渲染分數 HTML
+            btn.innerHTML = opt.text; 
+            btn.onclick = () => this.checkAnswer(btn, opt.isCorrect, q);
+            this.ui.options.appendChild(btn);
+        });
+    },
+
+    checkAnswer: function(btn, isCorrect, qData) {
+        const allBtns = document.querySelectorAll('.option-btn');
+        allBtns.forEach(b => b.disabled = true);
+
+        if (isCorrect) {
+            btn.classList.add('btn-correct');
+            this.score += 100;
+            this.fireLaser();
+            audioSys.playShoot();
+            setTimeout(() => {
+                this.destroyEnemy();
+                audioSys.playHit();
+            }, 300);
+        } else {
+            btn.classList.add('btn-wrong');
+            // 尋找並標示正確答案，比較 innerHTML
+            allBtns.forEach(b => {
+                if(b.innerHTML === qData.correctText) b.classList.add('btn-correct');
+            });
+            
+            this.ui.enemy.classList.add('enemy-shake');
+            audioSys.playWrong();
+            
+            this.wrongAnswers.push({
+                q: qData.question,
+                myAns: btn.innerHTML,
+                rightAns: qData.correctText,
+                expl: qData.explanation
+            });
+        }
+
+        setTimeout(() => {
+            this.nextQuestion();
+        }, 1500);
+    },
+
+    fireLaser: function() {
+        const laser = this.ui.laser;
+        laser.style.display = 'block';
+        laser.style.height = '50px';
+        laser.style.bottom = '100px';
+        
+        let pos = 100;
+        const anim = setInterval(() => {
+            pos += 15;
+            laser.style.bottom = pos + 'px';
+            laser.style.height = (pos/2) + 'px';
+            if (pos > 300) {
+                clearInterval(anim);
+                laser.style.display = 'none';
+            }
+        }, 16);
+    },
+
+    destroyEnemy: function() {
+        this.ui.enemy.style.transform = "scale(1.5)";
+        this.ui.enemy.style.opacity = "0";
+        setTimeout(() => {
+            this.ui.enemy.style.transform = "scale(1)";
+        }, 200);
+    },
+
+    nextQuestion: function() {
+        this.currentIndex++;
+        this.updateHUD();
+
+        if (this.currentIndex < this.totalQuestions) {
+            this.loadQuestion();
+        } else {
+            this.gameOver();
+        }
+    },
+
+    gameOver: function() {
+        this.switchScreen('end');
+        this.ui.finalScore.innerText = `總分: ${this.score}`;
+        audioSys.playWin();
+
+        const pct = this.score / (this.totalQuestions * 100);
+        let rank = 'C';
+        if (pct === 1) rank = 'SSS';
+        else if (pct >= 0.8) rank = 'A';
+        else if (pct >= 0.6) rank = 'B';
+        this.ui.finalRank.innerText = rank;
+
+        const list = this.ui.reviewList;
+        list.innerHTML = '';
+        if (this.wrongAnswers.length > 0) {
+            this.ui.reviewContainer.style.display = 'block';
+            this.wrongAnswers.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'review-item';
+                div.innerHTML = `
+                    <div class="review-q">Q: ${item.q}</div>
+                    <div class="review-ans">你的選擇: <span style="text-decoration:line-through">${item.myAns}</span></div>
+                    <div class="review-ans review-correct">正確答案: ${item.rightAns}</div>
+                    <div class="review-expl">💡 ${item.expl}</div>
+                `;
+                list.appendChild(div);
+            });
+        } else {
+            this.ui.reviewContainer.style.display = 'none';
+            const div = document.createElement('div');
+            div.innerHTML = "<p style='color:#00ff00; text-align:center;'>完美通關！沒有錯誤！</p>";
+            list.appendChild(div);
+            this.ui.reviewContainer.style.display = 'block';
+        }
+    }
+};
+
+</script>
+</body>
+</html>
